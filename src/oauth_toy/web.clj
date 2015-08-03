@@ -39,7 +39,7 @@
   (GET "/user/age"
        []
     {:status 302
-     :headers {"location" "https://accounts.google.com/o/oauth2/auth?redirect_uri=https%3A%2F%2Fdevelopers.google.com%2Foauthplayground&response_type=code&client_id=407408718192.apps.googleusercontent.com&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.readonly&approval_prompt=force&access_type=offline"}})
+     :headers {"location" "http://localhost:8080/o/oauth2/auth?redirect_uri=http%3A%2F%2Flocalhost:8080%2Fuser%2Fage&client_id=123&scope=age&access_type=offline"}})
 
   (route/not-found (error-response "Resource not found" 404)))
 
