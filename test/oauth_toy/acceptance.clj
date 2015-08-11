@@ -75,4 +75,16 @@
           (http/get url {:throw-exceptions false
                          :follow-redirects false
                          :query-params     {:authorization-code "invalid_code"}}) => (contains {:status 403})))
+
+  (future-fact "return forbidden when using authorization-code from other resource")
+
+  (future-fact "return forbidden for expired authorization-code"
+               ;; set date directly via calling oauth resource directly
+               )
+
+  (future-fact "Get access to resource if the authorization scope contains the resource"
+               ;; call auth directly with scope to create authorization scope
+               )
+
+  (future-fact "refresh token - not sure yet will need to have a think about how this works")
   )
