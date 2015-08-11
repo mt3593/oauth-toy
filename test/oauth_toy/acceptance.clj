@@ -45,11 +45,11 @@
                                                                      :follow-redirects false})
               location (url->map (get headers "Location"))]
           status => 302
-          location => (contains {:url "http://localhost:8080/o/oauth2/auth"
+          location => (contains {:url          "http://localhost:8080/o/oauth2/auth"
                                  :redirect_uri "http://localhost:8080/user/age"
-                                 :access_type "offline"
-                                 :client_id valid-client-id
-                                 :scope "age"})))
+                                 :access_type  "offline"
+                                 :client_id    valid-client-id
+                                 :scope        "age"})))
 
   (fact "After signin return Authorization code"
         ;; follow redirect, this should for our example return a valid authorized token in the next redirect
@@ -59,8 +59,20 @@
                                                                            :follow-redirects false})
               location (url->map (get headers "Location"))]
           status => 302
-          location => (contains {:url "http://localhost:8080/user/age"
+          location => (contains {:url                "http://localhost:8080/user/age"
                                  :authorization-code valid-authorization-code})))
 
-  (future-fact "get access to secure resourse")
+  (fact "Get access to secure resourse, will get authorization token and follow redirects to access the resource"
+        (http/get (url+ "/user/age") {:throw-exceptions false
+                                      :follow-redirects true}) => (contains {:status 200}))
+
+  (fact "return forbidden on invalid authorization code"
+        (let [{headers :headers} (http/get (url+ "/user/age") {:throw-exceptions false
+                                                               :follow-redirects false})
+              {:keys [headers]} (http/get (get headers "Location") {:throw-exceptions false
+                                                                    :follow-redirects false})
+              {:keys [url]} (url->map (get headers "Location"))]
+          (http/get url {:throw-exceptions false
+                         :follow-redirects false
+                         :query-params     {:authorization-code "invalid_code"}}) => (contains {:status 403})))
   )

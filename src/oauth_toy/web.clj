@@ -13,35 +13,45 @@
             [ring.middleware
              [format-params :refer [wrap-json-kw-params]]
              [json :refer [wrap-json-response]]
-             [params :refer [wrap-params]]]))
+             [params :refer [wrap-params]]]
+            [oauth-toy.oauth :as o]))
 
 (def version
   (setup/version "oauth-toy"))
 
 (defn healthcheck
   []
-  (let [body {:name "oauth-toy"
-              :version version
-              :success true
+  (let [body {:name         "oauth-toy"
+              :version      version
+              :success      true
               :dependencies []}]
     {:headers {"content-type" "application/json"}
-     :status (if (:success body) 200 500)
-     :body body}))
+     :status  (if (:success body) 200 500)
+     :body    body}))
 
 (defroutes routes
 
-  (GET "/healthcheck"
-       [] (healthcheck))
+           (GET "/healthcheck"
+                [] (healthcheck))
 
-  (GET "/ping"
-       [] "pong")
+           (GET "/ping"
+                [] "pong")
 
-  (GET "/user/age"
-       []
-    {:status 302
-     :headers {"location" "http://localhost:8080/o/oauth2/auth?redirect_uri=http%3A%2F%2Flocalhost:8080%2Fuser%2Fage&client_id=123&scope=age&access_type=offline"}})
+           (GET "/user/age"
+                {{code "authorization-code"} :params}
+             (if code
+               (if (o/is-authorisation-code-valid? code)
+                 {:status 200}
+                 {:status 403})
+               {:status  302
+                :headers {"location" "http://localhost:8080/o/oauth2/auth?redirect_uri=http%3A%2F%2Flocalhost:8080%2Fuser%2Fage&client_id=123&scope=age&access_type=offline"}}))
 
-  (route/not-found (error-response "Resource not found" 404)))
+           (GET "/o/oauth2/auth"
+                []
+             {:status  302
+              :headers {"location" (str "http://localhost:8080/user/age?authorization-code=" (o/generate-new-authorisation-code))}})
+
+           (route/not-found (error-response "Resource not found" 404)))
 
 (def app
   (-> routes
