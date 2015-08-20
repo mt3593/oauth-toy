@@ -31,6 +31,12 @@
   ([m]
    (http/get (url+ "/user/age") (merge {:throw-exceptions false
                                         :follow-redirects false} m))))
+(defn get-name
+  ([]
+   (get-name {}))
+  ([m]
+   (http/get (url+ "/user/name") (merge {:throw-exceptions false
+                                         :follow-redirects false} m))))
 
 (defn follow-redirect
   [{headers :headers}]
@@ -39,6 +45,76 @@
 
 (fact-group
   :acceptance
+
+  (facts "age"
+
+         (fact "Request to a users resource returns a o-auth redirect"
+               (let [{:keys [headers status]} (get-age)
+                     location (url->map (get headers "Location"))]
+                 status => 302
+                 location => (contains {:url          "http://localhost:8080/o/oauth2/auth"
+                                        :redirect_uri "http://localhost:8080/user/age"
+                                        :access_type  "offline"
+                                        :client_id    valid-client-id
+                                        :scope        "age"})))
+
+         (fact "After signin return Authorization code"
+               ;; follow redirect, this should for our example return a valid authorized token in the next redirect
+               (let [{:keys [status headers]} (-> (get-age)
+                                                  follow-redirect)
+                     location (url->map (get headers "Location"))]
+                 status => 302
+                 location => (contains {:url                "http://localhost:8080/user/age"
+                                        :authorization-code valid-authorization-code})))
+
+         (fact "Get access to secure resourse, will get authorization token and follow redirects to access the resource"
+               (get-age {:follow-redirects true}) => (contains {:status 200}))
+
+         (fact "return forbidden on invalid authorization code"
+               (let [{:keys [url]} (-> (get-age)
+                                       follow-redirect
+                                       (get-in [:headers "Location"])
+                                       url->map)]
+                 (http/get url {:throw-exceptions false
+                                :follow-redirects false
+                                :query-params     {:authorization-code "invalid_code"}}) => (contains {:status 403})))
+
+         )
+
+  (facts "name"
+
+         (fact "Request to a users resource returns a o-auth redirect"
+               (let [{:keys [headers status]} (get-name)
+                     location (url->map (get headers "Location"))]
+                 status => 302
+                 location => (contains {:url          "http://localhost:8080/o/oauth2/auth"
+                                        :redirect_uri "http://localhost:8080/user/name"
+                                        :access_type  "offline"
+                                        :client_id    valid-client-id
+                                        :scope        "name"})))
+
+         (fact "After signin return Authorization code"
+               ;; follow redirect, this should for our example return a valid authorized token in the next redirect
+               (let [{:keys [status headers]} (-> (get-name)
+                                                  follow-redirect)
+                     location (url->map (get headers "Location"))]
+                 status => 302
+                 location => (contains {:url                "http://localhost:8080/user/name"
+                                        :authorization-code valid-authorization-code})))
+
+         (fact "Get access to secure resourse, will get authorization token and follow redirects to access the resource"
+               (get-name {:follow-redirects true}) => (contains {:status 200}))
+
+         (fact "return forbidden on invalid authorization code"
+               (let [{:keys [url]} (-> (get-name)
+                                       follow-redirect
+                                       (get-in [:headers "Location"])
+                                       url->map)]
+                 (http/get url {:throw-exceptions false
+                                :follow-redirects false
+                                :query-params     {:authorization-code "invalid_code"}}) => (contains {:status 403})))
+
+         )
 
   (fact "Ping resource returns 200 HTTP response"
         (let [response (http/get (url+ "/ping") {:throw-exceptions false})]
@@ -52,47 +128,25 @@
                              :success true
                              :version truthy})))
 
-  (fact "Request to a users resource returns a o-auth redirect"
-        (let [{:keys [headers status]} (get-age)
-              location (url->map (get headers "Location"))]
-          status => 302
-          location => (contains {:url          "http://localhost:8080/o/oauth2/auth"
-                                 :redirect_uri "http://localhost:8080/user/age"
-                                 :access_type  "offline"
-                                 :client_id    valid-client-id
-                                 :scope        "age"})))
 
-  (fact "After signin return Authorization code"
-        ;; follow redirect, this should for our example return a valid authorized token in the next redirect
-        (let [{:keys [status headers]} (-> (get-age)
-                                           follow-redirect)
-              location (url->map (get headers "Location"))]
-          status => 302
-          location => (contains {:url                "http://localhost:8080/user/age"
-                                 :authorization-code valid-authorization-code})))
-
-  (fact "Get access to secure resourse, will get authorization token and follow redirects to access the resource"
-        (get-age {:follow-redirects true}) => (contains {:status 200}))
-
-  (fact "return forbidden on invalid authorization code"
-        (let [{:keys [url]} (-> (get-age)
-                                follow-redirect
-                                (get-in [:headers "Location"])
-                                url->map)]
-          (http/get url {:throw-exceptions false
-                         :follow-redirects false
-                         :query-params     {:authorization-code "invalid_code"}}) => (contains {:status 403})))
-
-  (fact "return forbidden when using authorization-code from other resource"
+  (fact "return forbidden when using authorization-code from another resource"
         (let [age-authorization-code (-> (get-age)
                                          (follow-redirect)
                                          (get-in [:headers "Location"])
                                          url->map
-                                         :valid-authorization-code)
+                                         :authorization-code)
               {:keys [status]} (http/get (url+ "/user/name") {:throw-exceptions false
                                                               :follow-redirects true
-                                                              :query-params {:authorization-code age-authorization-code}})]
+                                                              :query-params     {:authorization-code age-authorization-code}})]
           status => 403))
+
+  (fact "Can request for multiple resources return token, given no redirect_uri"
+        (let [{:keys [status body]} (http/get (url+ "/o/oauth2/auth") {:query-params {:scope "name|age"}
+                                                                       :throw-exceptions false
+                                                                       :as :json})]
+          status => 200
+          body => (contains {:authorization-code valid-authorization-code})))
+
 
   (future-fact "return forbidden for expired authorization-code"
                ;; set date directly via calling oauth resource directly

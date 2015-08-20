@@ -2,14 +2,14 @@
   (:import (java.util UUID)))
 
 
-(def valid-codes (atom #{}))
+(def valid-codes (atom {}))
 
 (defn generate-new-authorisation-code
-  []
+  [scope]
   (let [code (str (UUID/randomUUID))]
-    (reset! valid-codes (conj @valid-codes code))
+    (reset! valid-codes (merge @valid-codes {code #{scope}}))
     code))
 
 (defn is-authorisation-code-valid?
-  [code]
-  (contains? @valid-codes code))
+  [code scope]
+  (contains? (get @valid-codes code) scope))

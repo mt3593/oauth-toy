@@ -40,16 +40,25 @@
            (GET "/user/age"
                 {{code "authorization-code"} :params}
              (if code
-               (if (o/is-authorisation-code-valid? code)
+               (if (o/is-authorisation-code-valid? code "age")
                  {:status 200}
                  {:status 403})
                {:status  302
                 :headers {"location" "http://localhost:8080/o/oauth2/auth?redirect_uri=http%3A%2F%2Flocalhost:8080%2Fuser%2Fage&client_id=123&scope=age&access_type=offline"}}))
 
+           (GET "/user/name"
+                {{code "authorization-code"} :params}
+             (if code
+               (if (o/is-authorisation-code-valid? code "name")
+                 {:status 200}
+                 {:status 403})
+               {:status  302
+                :headers {"location" "http://localhost:8080/o/oauth2/auth?redirect_uri=http%3A%2F%2Flocalhost:8080%2Fuser%2Fname&client_id=123&scope=name&access_type=offline"}}))
+
            (GET "/o/oauth2/auth"
-                []
+                {{redirect-uri "redirect_uri" scope "scope"} :params}
              {:status  302
-              :headers {"location" (str "http://localhost:8080/user/age?authorization-code=" (o/generate-new-authorisation-code))}})
+              :headers {"location" (str redirect-uri "?authorization-code=" (o/generate-new-authorisation-code scope))}})
 
            (route/not-found (error-response "Resource not found" 404)))
 
