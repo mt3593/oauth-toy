@@ -25,6 +25,18 @@
   [authorization-code]
   (not (nil? authorization-code)))
 
+(defn get-age
+  ([]
+   (get-age {}))
+  ([m]
+   (http/get (url+ "/user/age") (merge {:throw-exceptions false
+                                        :follow-redirects false} m))))
+
+(defn follow-redirect
+  [{headers :headers}]
+  (http/get (get headers "Location") {:throw-exceptions false
+                                      :follow-redirects false}))
+
 (fact-group
   :acceptance
 
@@ -41,8 +53,7 @@
                              :version truthy})))
 
   (fact "Request to a users resource returns a o-auth redirect"
-        (let [{:keys [headers status]} (http/get (url+ "/user/age") {:throw-exceptions false
-                                                                     :follow-redirects false})
+        (let [{:keys [headers status]} (get-age)
               location (url->map (get headers "Location"))]
           status => 302
           location => (contains {:url          "http://localhost:8080/o/oauth2/auth"
@@ -53,30 +64,35 @@
 
   (fact "After signin return Authorization code"
         ;; follow redirect, this should for our example return a valid authorized token in the next redirect
-        (let [{headers :headers} (http/get (url+ "/user/age") {:throw-exceptions false
-                                                               :follow-redirects false})
-              {:keys [status headers]} (http/get (get headers "Location") {:throw-exceptions false
-                                                                           :follow-redirects false})
+        (let [{:keys [status headers]} (-> (get-age)
+                                           follow-redirect)
               location (url->map (get headers "Location"))]
           status => 302
           location => (contains {:url                "http://localhost:8080/user/age"
                                  :authorization-code valid-authorization-code})))
 
   (fact "Get access to secure resourse, will get authorization token and follow redirects to access the resource"
-        (http/get (url+ "/user/age") {:throw-exceptions false
-                                      :follow-redirects true}) => (contains {:status 200}))
+        (get-age {:follow-redirects true}) => (contains {:status 200}))
 
   (fact "return forbidden on invalid authorization code"
-        (let [{headers :headers} (http/get (url+ "/user/age") {:throw-exceptions false
-                                                               :follow-redirects false})
-              {:keys [headers]} (http/get (get headers "Location") {:throw-exceptions false
-                                                                    :follow-redirects false})
-              {:keys [url]} (url->map (get headers "Location"))]
+        (let [{:keys [url]} (-> (get-age)
+                                follow-redirect
+                                (get-in [:headers "Location"])
+                                url->map)]
           (http/get url {:throw-exceptions false
                          :follow-redirects false
                          :query-params     {:authorization-code "invalid_code"}}) => (contains {:status 403})))
 
-  (future-fact "return forbidden when using authorization-code from other resource")
+  (fact "return forbidden when using authorization-code from other resource"
+        (let [age-authorization-code (-> (get-age)
+                                         (follow-redirect)
+                                         (get-in [:headers "Location"])
+                                         url->map
+                                         :valid-authorization-code)
+              {:keys [status]} (http/get (url+ "/user/name") {:throw-exceptions false
+                                                              :follow-redirects true
+                                                              :query-params {:authorization-code age-authorization-code}})]
+          status => 403))
 
   (future-fact "return forbidden for expired authorization-code"
                ;; set date directly via calling oauth resource directly
