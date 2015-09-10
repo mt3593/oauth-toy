@@ -141,20 +141,30 @@
           status => 403))
 
   (fact "Can request for multiple resources return token, given no redirect_uri"
-        (let [{:keys [status body]} (http/get (url+ "/o/oauth2/auth") {:query-params {:scope "name|age"}
+        (let [{:keys [status body]} (http/get (url+ "/o/oauth2/auth") {:query-params     {:scope "name|age"}
                                                                        :throw-exceptions false
-                                                                       :as :json})]
+                                                                       :as               :json})]
           status => 200
           body => (contains {:authorization-code valid-authorization-code})))
+
+  (fact "Can use access token to request from multiple resources"
+        (let [{{code :authorization-code} :body} (http/get (url+ "/o/oauth2/auth") {:query-params     {:scope "name|age"}
+                                                                                    :throw-exceptions false
+                                                                                    :as               :json})
+              {status-name :status} (http/get (url+ "/user/name") {:throw-exceptions false
+                                                                   :follow-redirects false
+                                                                   :query-params     {:authorization-code code}})
+              {status-age :status} (http/get (url+ "/user/age") {:throw-exceptions false
+                                                                 :follow-redirects false
+                                                                 :query-params     {:authorization-code code}})]
+          status-name => 200
+          status-age => 200))
 
 
   (future-fact "return forbidden for expired authorization-code"
                ;; set date directly via calling oauth resource directly
                )
 
-  (future-fact "Get access to resource if the authorization scope contains the resource"
-               ;; call auth directly with scope to create authorization scope
-               )
 
   (future-fact "refresh token - not sure yet will need to have a think about how this works")
   )

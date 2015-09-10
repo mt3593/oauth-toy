@@ -57,8 +57,11 @@
 
            (GET "/o/oauth2/auth"
                 {{redirect-uri "redirect_uri" scope "scope"} :params}
-             {:status  302
-              :headers {"location" (str redirect-uri "?authorization-code=" (o/generate-new-authorisation-code scope))}})
+             (if redirect-uri
+               {:status  302
+                :headers {"location" (str redirect-uri "?authorization-code=" (o/generate-new-authorisation-code scope))}}
+               {:status 200
+                :body {:authorization-code (o/generate-new-authorisation-code scope)}}))
 
            (route/not-found (error-response "Resource not found" 404)))
 

@@ -7,7 +7,9 @@
 (defn generate-new-authorisation-code
   [scope]
   (let [code (str (UUID/randomUUID))]
-    (reset! valid-codes (merge @valid-codes {code #{scope}}))
+    (reset! valid-codes (merge @valid-codes {code (-> scope
+                                                      (clojure.string/split #"\|")
+                                                      set)}))
     code))
 
 (defn is-authorisation-code-valid?
